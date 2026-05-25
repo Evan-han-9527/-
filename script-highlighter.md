@@ -297,15 +297,20 @@ font-size: 17px;        /* 正文 */
 html { scroll-behavior: smooth; }
 ```
 
-### 3.9 手机适配
+### 3.9 多设备适配
 
 ```css
-/* 平板/大屏手机 */
+/* 小桌面 / 平板横屏 */
+@media (max-width: 1024px) {
+  .container { padding: 28px 32px; }
+}
+
+/* 平板竖屏 */
 @media (max-width: 768px) {
   .container { padding: 24px 20px; }
 }
 
-/* 手机横屏/小屏 */
+/* 手机 */
 @media (max-width: 640px) {
   body { padding: 16px 10px; font-size: 16px; }
   .container { padding: 20px 16px; border-radius: 8px; }

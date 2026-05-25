@@ -73,6 +73,16 @@ input[type=text]:focus,select:focus{outline:none;border-color:#C4A882;box-shadow
 .error.show{display:block}
 .preview-stats{color:#5A4A3A;font-size:14px;text-align:center;margin:12px 0;line-height:1.8}
 .preview-stats strong{color:#3A4A3A}
+/* 平板竖屏 & 小桌面 */
+@media(max-width:1024px){
+  .container{padding:28px 32px}
+}
+/* 平板横屏 & 大手机 */
+@media(max-width:768px){
+  .container{padding:24px 20px}
+  .radio-group{gap:8px}
+}
+/* 手机 */
 @media(max-width:640px){
   .container{padding:20px 16px;border-radius:8px}
   h1{font-size:22px}
@@ -84,6 +94,7 @@ input[type=text]:focus,select:focus{outline:none;border-color:#C4A882;box-shadow
   .result-actions .btn{text-align:center}
   #previewFrame{height:350px!important}
 }
+/* 小屏手机 */
 @media(max-width:400px){
   body{padding:10px 6px;font-size:15px}
   .container{padding:14px 10px;border-radius:6px}
@@ -824,6 +835,8 @@ function generateHTML(bodyBg, containerBg, textColor, otherColor) {
     '  .back-to-top { display:block; width:fit-content; margin:28px auto 0; padding:10px 28px; background:#C4A882; color:#fff; font-size:15px; font-weight:700; text-align:center; text-decoration:none; border-radius:24px; letter-spacing:2px; transition:background .2s; }\n' +
     '  .back-to-top:hover { background:#A88B6A; }\n' +
     '  html { scroll-behavior:smooth; }\n' +
+    '  @media(max-width:1024px) { .container{padding:28px 32px} }\n' +
+    '  @media(max-width:768px) { .container{padding:24px 20px} }\n' +
     '  @media(max-width:640px) { body{padding:16px 10px;font-size:16px} .container{padding:20px 16px;border-radius:8px} h1{font-size:22px;letter-spacing:2px} .scene-title{font-size:16px;margin-top:16px} .stage-dir{font-size:13px} .toc{padding:12px 14px} .toc-list li{font-size:13px;padding:4px 0} .toc-chars{font-size:12px} .to-top{font-size:12px} .back-to-top{padding:8px 22px;font-size:14px} }\n' +
     '  @media(max-width:400px) { body{padding:10px 6px;font-size:15px} .container{padding:14px 10px;border-radius:6px} h1{font-size:19px;letter-spacing:1px} .toc{padding:10px 10px} .toc-title{font-size:15px} .toc-list li{font-size:12px;padding:3px 0} .toc-chars{font-size:11px} .to-top{font-size:11px;padding:0 4px} .back-to-top{padding:6px 18px;font-size:13px} }\n' +
     '</style>\n</head>\n<body>\n<div class="container">\n' +
