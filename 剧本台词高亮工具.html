@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>剧本台词高亮工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#F5E6D3;color:#332;
+  font-family:'Noto Serif SC','SimSun','STSong','Songti SC',serif;
+  line-height:1.8;padding:30px 16px;font-size:16px;
+  min-height:100vh
+}
+.container{max-width:720px;margin:0 auto;background:#FDF6EC;padding:36px 44px;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+h1{text-align:center;font-size:26px;color:#5A3E2E;letter-spacing:4px;padding-bottom:14px;border-bottom:2px solid #E0D0B8;margin-bottom:20px}
+.step{display:none}.step.active{display:block}
+.step-title{font-size:18px;font-weight:700;color:#5A4A3A;margin-bottom:16px;padding:8px 0;border-bottom:1px dashed #E0D0B8}
+label{display:block;margin:12px 0 4px;font-weight:700;color:#4A3A2A;font-size:15px}
+.btn{
+  display:inline-block;padding:10px 28px;background:#C4A882;color:#fff;
+  font-size:15px;font-weight:700;border:none;border-radius:24px;
+  cursor:pointer;transition:background .2s;letter-spacing:1px;margin-top:16px
+}
+.btn:hover{background:#A88B6A}.btn:disabled{background:#aaa;cursor:not-allowed}
+.btn-small{padding:6px 16px;font-size:13px;margin:4px}
+.btn-danger{background:#e74c3c}.btn-danger:hover{background:#c0392b}
+.upload-area{
+  border:3px dashed #C4A882;border-radius:12px;padding:40px 20px;
+  text-align:center;cursor:pointer;transition:all .3s;margin:16px 0
+}
+.upload-area:hover,.upload-area.dragover{border-color:#A88B6A;background:rgba(196,168,130,.1)}
+.upload-area .icon{font-size:48px;color:#C4A882;margin-bottom:12px}
+.upload-area p{color:#5A4A3A;font-size:15px}
+.upload-area .sub{color:#7A6A5A;font-size:13px;margin-top:6px}
+.file-info{
+  background:rgba(196,168,130,.15);border-radius:8px;padding:12px 16px;
+  margin:12px 0;display:flex;align-items:center;justify-content:space-between
+}
+.file-info .name{font-weight:700;color:#3A4A3A}
+.file-info .size{color:#7A6A5A;font-size:13px}
+.form-group{margin:16px 0;padding:16px;background:rgba(255,255,255,.25);border-radius:8px}
+.form-group-title{font-weight:700;color:#4A3A2A;margin-bottom:10px;font-size:15px}
+.radio-group{display:flex;gap:12px;flex-wrap:wrap}
+.radio-group label{font-weight:400;font-size:14px;cursor:pointer;margin:0;display:flex;align-items:center;gap:6px}
+.radio-group input[type=radio]{width:16px;height:16px;accent-color:#C4A882}
+.color-picker{width:40px;height:32px;border:1px solid #aaa;border-radius:4px;padding:2px;cursor:pointer;vertical-align:middle}
+.char-entry{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
+.char-entry input{flex:1;min-width:80px}
+.char-entry .color-picker{flex:0 0 40px}
+input[type=text],select{
+  padding:8px 12px;border:1px solid #E0D0B8;border-radius:6px;
+  font-family:inherit;font-size:14px;background:#fff;width:100%;transition:border .2s
+}
+input[type=text]:focus,select:focus{outline:none;border-color:#C4A882;box-shadow:0 0 0 2px rgba(196,168,130,.2)}
+.char-list{margin:8px 0}
+.char-item{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;
+  background:rgba(255,255,255,.4);border-radius:6px;margin:4px 0
+}
+.char-item .name{font-weight:700;flex:1}
+.char-item .color-dot{width:16px;height:16px;border-radius:4px;display:inline-block}
+.color-input-row{display:flex;gap:8px;align-items:center}
+.color-input-row input[type=text]{flex:1}
+.loading{text-align:center;padding:40px 0}
+.loading .spinner{width:40px;height:40px;border:4px solid #FDF6EC;border-top-color:#C4A882;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{color:#5A4A3A;font-size:15px}
+.result-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:20px 0}
+.hint{color:#7A6A5A;font-size:13px;margin-top:4px}
+.error{color:#e74c3c;font-size:14px;margin:8px 0;padding:8px 12px;background:rgba(231,76,60,.1);border-radius:6px;display:none}
+.error.show{display:block}
+.preview-stats{color:#5A4A3A;font-size:14px;text-align:center;margin:12px 0;line-height:1.8}
+.preview-stats strong{color:#3A4A3A}
+@media(max-width:640px){
+  .container{padding:20px 16px;border-radius:8px}
+  h1{font-size:22px}
+  .upload-area{padding:24px 16px}
+  .radio-group{flex-direction:column;gap:6px}
+  .char-entry{flex-wrap:wrap}
+  .char-entry input[type=text]{flex:1 1 100%}
+  .result-actions{flex-direction:column;align-items:stretch}
+  .result-actions .btn{text-align:center}
+  #previewFrame{height:350px!important}
+}
+@media(max-width:400px){
+  body{padding:10px 6px;font-size:15px}
+  .container{padding:14px 10px;border-radius:6px}
+  h1{font-size:19px;letter-spacing:2px}
+  #previewFrame{height:280px!important}
+}
+
+/* iOS Safari smooth scroll fix */
+*{-webkit-tap-highlight-color:transparent}
+.btn,.to-top,.back-to-top,.toc-list a{cursor:pointer;-webkit-touch-callout:none}
+input,select,button{font-size:16px!important}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+<h1>🎭 剧本台词高亮工具</h1>
+
+<!-- Step 1: Upload -->
+<div class="step active" id="step-upload">
+  <div class="step-title">📂 第一步：上传剧本文件</div>
+  <div class="upload-area" id="uploadArea">
+    <div class="icon">📄</div>
+    <p>点击此处或拖拽文件到此处</p>
+    <p class="sub">支持 .doc .docx .txt 格式</p>
+    <input type="file" id="fileInput" accept=".doc,.docx,.txt" style="display:none">
+  </div>
+  <div id="fileInfo" style="display:none"></div>
+  <div class="error" id="fileError"></div>
+</div>
+
+<!-- Step 2: Config -->
+<div class="step" id="step-config">
+  <div class="step-title">⚙️ 第二步：配置高亮参数</div>
+
+  <div class="form-group">
+    <div class="form-group-title">1. 背景模式</div>
+    <div class="radio-group">
+      <label><input type="radio" name="bgMode" value="eye" checked> 护眼模式（豆沙绿）</label>
+      <label><input type="radio" name="bgMode" value="default"> 默认（茶白色）</label>
+      <label><input type="radio" name="bgMode" value="custom"> 自定义</label>
+    </div>
+    <div id="customBg" style="display:none;margin-top:8px">
+      <div class="color-input-row">
+        <input type="text" id="bgColorInput" placeholder="#F5E6D3" value="#F5E6D3">
+        <input type="color" id="bgColorPicker" value="#F5E6D3" class="color-picker">
+      </div>
+      <div class="hint">页面背景色</div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <div class="form-group-title">2. 高亮角色 <span class="hint" style="font-weight:400">（勾选需要高亮的角色，可调颜色）</span></div>
+    <div id="charCheckboxList" class="char-list"></div>
+    <div class="error" id="charError"></div>
+  </div>
+
+    <div class="form-group">
+    <div class="form-group-title">4. 其他角色台词颜色</div>
+    <div class="radio-group">
+      <label><input type="radio" name="otherColor" value="black" checked> 黑色（默认）</label>
+      <label><input type="radio" name="otherColor" value="custom"> 自定义</label>
+    </div>
+    <div id="customOther" style="display:none;margin-top:8px">
+      <div class="color-input-row">
+        <input type="text" id="otherColorInput" placeholder="#000000" value="#333333">
+        <input type="color" id="otherColorPicker" value="#333333" class="color-picker">
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center">
+    <button class="btn" onclick="generate()">🚀 生成台词高亮页</button>
+  </div>
+  <div class="error" id="genError"></div>
+</div>
+
+<!-- Step 3: Scene Review -->
+<div class="step" id="step-review">
+  <div class="step-title">📋 第三步：确认场景目录</div>
+  <p class="hint" style="margin-bottom:16px">以下是自动检索到的场景标题，请核对。如有遗漏或错误，可增删改。</p>
+  <div id="reviewSceneList"></div>
+  <div class="char-entry" style="margin-top:8px">
+    <input type="text" id="reviewNewTitle" placeholder="输入场景名称，如：第一幕：第一场" style="flex:2">
+    <button class="btn btn-small" onclick="addReviewScene()">＋ 添加</button>
+  </div>
+  <div class="error" id="reviewError"></div>
+  <div style="text-align:center;margin-top:20px">
+    <button class="btn" onclick="confirmScenes()">✅ 确认无误，继续生成</button>
+    <button class="btn btn-danger btn-small" onclick="showStep('step-config')" style="margin-top:8px">← 返回修改参数</button>
+  </div>
+</div>
+
+<!-- Step 4: Loading -->
+<div class="step" id="step-loading">
+  <div class="loading">
+    <div class="spinner"></div>
+    <p>正在解析剧本并生成高亮页面…</p>
+  </div>
+</div>
+
+<!-- Step 4: Result -->
+<div class="step" id="step-result">
+  <div class="step-title">✅ 生成完成！</div>
+  <div id="resultInfo" class="preview-stats"></div>
+  <div class="result-actions">
+    <button class="btn" onclick="downloadResult()">📥 下载 HTML 文件</button>
+    <button class="btn" onclick="previewResult()">👁️ 预览</button>
+    <button class="btn btn-danger btn-small" onclick="resetAll()" style="margin-top:0">🔄 重新开始</button>
+  </div>
+  <div id="previewArea" style="display:none;margin-top:16px;border:2px solid #E0D0B8;border-radius:8px;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff">
+    <iframe id="previewFrame" style="width:100%;height:500px;border:none;background:#fff;display:block"></iframe>
+  </div>
+</div>
+
+<div style="text-align:center;margin-top:12px;font-size:11px;color:#8a7a6a;opacity:0.5">晨眠 &amp; reasonix &amp; ds-v4</div>
+</div>
+
+<script>
+// ====== Global State ======
+let uploadedFile = null;
+let fileText = '';
+let fileLines = [];
+let highlightChars = [];
+let resultHTML = '';
+let sceneTitles = [];
+let editedScenes = [];
+
+// ====== Upload Handling ======
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+
+uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if(e.target.files.length) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  const errEl = document.getElementById('fileError');
+  errEl.classList.remove('show');
+  if(!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if(!['doc','docx','txt'].includes(ext)) {
+    showError('fileError','仅支持 .doc、.docx、.txt 格式');
+    return;
+  }
+  uploadedFile = file;
+  try {
+    if(ext === 'txt') {
+      fileText = await file.text();
+    } else if(ext === 'docx') {
+      fileText = await parseDocx(file);
+    } else if(ext === 'doc') {
+      fileText = await parseDoc(file);
+    }
+    // Basic validation
+    if(!fileText || fileText.length < 50) {
+      throw new Error('解析结果为空或内容过短，请尝试将文件另存为「纯文本.txt」格式再上传。');
+    }
+    // Normalize line endings
+    fileText = fileText.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    // Trim leading garbage - find script title or first meaningful line
+    const scriptStart = fileText.indexOf('宅锁孤灯');
+    if(scriptStart > 0) fileText = fileText.substring(scriptStart);
+    // Cut at last 谢幕 to remove font table garbage
+    const lastXie = fileText.lastIndexOf('谢幕');
+    if(lastXie > 0) {
+      const afterXie = fileText.indexOf('\n', lastXie);
+      fileText = afterXie > 0 ? fileText.substring(0, afterXie) : fileText.substring(0, lastXie + 2);
+    }
+    showFileInfo(file);
+    document.querySelector('#step-upload').classList.remove('active');
+    document.querySelector('#step-config').classList.add('active');
+    initChars();
+  } catch(e) {
+    let msg = e.message;
+    if(msg.includes('ZIP') || msg.includes('central directory')) {
+      msg = 'docx 解析失败：文件不是有效的 ZIP 格式。请尝试：① 用 Word 另存为「.doc」格式再上传；② 或另存为「纯文本 .txt」格式上传。';
+    }
+    showError('fileError','文件解析失败：'+msg);
+    console.error(e);
+  }
+}
+
+async function parseDocx(file) {
+  if(typeof JSZip === 'undefined') {
+    throw new Error('JSZip 库未加载，请检查网络连接后刷新页面重试。');
+  }
+  // ALWAYS read via FileReader first (mobile-safe: FileReader doesn't consume the blob)
+  // JSZip.loadAsync(file) can fail on some mobile browsers if the File stream is reused
+  const buf = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('读取文件失败'));
+    reader.readAsArrayBuffer(file);
+  });
+  if(!buf || buf.byteLength < 50) {
+    throw new Error('文件读取结果为空，请确认文件有效。建议：用 Word 打开后另存为「.doc」或「纯文本.txt」再上传。');
+  }
+  // Verify ZIP magic bytes (PK\x03\x04)
+  const header = new Uint8Array(buf, 0, 4);
+  const isZip = header[0] === 0x50 && header[1] === 0x4B && header[2] === 0x03 && header[3] === 0x04;
+  if(!isZip) {
+    // Auto-fallback: try parsing as .doc (old binary format) in case of wrong extension
+    const docText = parseDocRaw(buf);
+    if(docText && docText.length > 100) return docText;
+    throw new Error('文件不是有效的 ZIP 格式。建议：用 Word 打开后另存为「.doc」或「纯文本.txt」再上传。');
+  }
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(buf);
+  } catch(e) {
+    throw new Error('无法解析此文件。建议：用 Word 打开后另存为「.doc」或「纯文本.txt」再上传。');
+  }
+  const xmlFile = zip.file('word/document.xml');
+  if(!xmlFile) throw new Error('未找到文档内容。建议：用 Word 打开后另存为「.doc」格式再上传。');
+  const xml = await xmlFile.async('text');
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  // Parse by paragraph - handle both namespaced and non-namespaced XML
+  const paragraphs = [];
+  try {
+    // Standard OOXML namespace
+    doc.querySelectorAll('w\\:p').forEach(p => paragraphs.push(p));
+  } catch(e) {
+    // Fallback for browsers that don't handle CSS namespace well
+    doc.querySelectorAll('p').forEach(p => paragraphs.push(p));
+  }
+  if(paragraphs.length === 0) {
+    // Last resort: scan all elements for text
+    const allElements = doc.querySelectorAll('*');
+    const textSet = new Set();
+    allElements.forEach(el => {
+      if(el.textContent.trim() && el.children.length === 0) {
+        textSet.add(el.textContent.trim());
+      }
+    });
+    if(textSet.size > 0) return Array.from(textSet).join('\n');
+    throw new Error('文档内容为空，请确认文件包含文本。');
+  }
+  const lines = [];
+  for(const p of paragraphs) {
+    let runs;
+    try { runs = p.querySelectorAll('w\\:t, t'); } catch(e) { runs = p.querySelectorAll('t'); }
+    const text = Array.from(runs).map(r => r.textContent).join('').trim();
+    if(text) lines.push(text);
+  }
+  if(lines.length === 0) throw new Error('文档内容为空，请确认文件包含文本。');
+  return lines.join('\n');
+}
+
+// Raw .doc parser from ArrayBuffer (used both directly and as docx fallback)
+function parseDocRaw(buf) {
+  const bytes = new Uint8Array(buf);
+  let raw = '';
+  for(let i=0; i<bytes.length; i+=2) {
+    const code = bytes[i] | (bytes[i+1] << 8);
+    if(code === 0) continue;
+    raw += String.fromCharCode(code);
+  }
+  raw = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  let clean = '';
+  for(let i=0; i<raw.length; i++) {
+    const c = raw[i];
+    const code = c.charCodeAt(0);
+    if((code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3000 && code <= 0x303f) || '，。！？、：（）【】\n'.includes(c) || c === ' ') {
+      clean += c;
+    }
+  }
+  clean = clean.replace(/\n{4,}/g, '\n\n\n');
+  return clean;
+}
+
+async function parseDoc(file) {
+  const buf = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('读取文件失败'));
+    reader.readAsArrayBuffer(file);
+  });
+  const docText = parseDocRaw(buf);
+  if(!docText || docText.length < 50) throw new Error('文件内容为空，请确认文件有效。');
+  return docText;
+}
+
+function showFileInfo(file) {
+  const el = document.getElementById('fileInfo');
+  const size = file.size < 1024 ? file.size+'B' : file.size<1048576 ? (file.size/1024).toFixed(1)+'KB' : (file.size/1048576).toFixed(1)+'MB';
+  el.style.display = 'block';
+  el.innerHTML = '<div class="file-info"><span><span class="name">'+file.name+'</span> <span class="size">('+size+')</span></span><button class="btn btn-small btn-danger" onclick="resetUpload()" style="margin:0">重新选择</button></div>';
+}
+
+function resetUpload() {
+  uploadedFile = null; fileText = '';
+  document.getElementById('fileInfo').style.display = 'none';
+  fileInput.value = '';
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('show');
+}
+
+// ====== Config ======
+const presetColors = ['#7C3AED','#B8860B','#E67E22','#DC2626','#2980B9','#27AE60','#E74C3C','#8E44AD','#2C3E50','#D35400'];
+let colorIdx = 0;
+
+// Background mode toggle
+document.querySelectorAll('input[name="bgMode"]').forEach(r => {
+  r.addEventListener('change', function() {
+    document.getElementById('customBg').style.display = this.value === 'custom' ? 'block' : 'none';
+  });
+});
+document.querySelectorAll('input[name="otherColor"]').forEach(r => {
+  r.addEventListener('change', function() {
+    document.getElementById('customOther').style.display = this.value === 'custom' ? 'block' : 'none';
+  });
+});
+
+// Sync color inputs
+['bgColor','otherColor'].forEach(prefix => {
+  const input = document.getElementById(prefix+'Input');
+  const picker = document.getElementById(prefix+'Picker');
+  input.addEventListener('input', () => picker.value = input.value);
+  picker.addEventListener('input', () => input.value = picker.value);
+});
+
+function initChars() {
+  // Scan all verified character names from the text
+  const lines = fileText.split('\n').map(l=>l.trim()).filter(l=>l&&/[\u4e00-\u9fff]/.test(l));
+  const nameCount = {};
+  const skipNames = new Set(['幕间过场','幕间','冬第四幕','春尾声','序幕','谢幕']);
+  for(const line of lines) {
+    if(line.startsWith('【') || /^第.+场/.test(line) || /^序幕/.test(line) || /^[春夏秋冬]$/.test(line) || /^谢幕/.test(line)) continue;
+    const dm = line.match(/^(.+?)(（[^）]*）)?[：:](.+)/);
+    if(dm) {
+      let cname = dm[1].trim().replace(/\s+/g,'');
+      if(!skipNames.has(cname) && /^[\u4e00-\u9fff]{1,6}$/.test(cname)) {
+        nameCount[cname] = (nameCount[cname]||0) + 1;
+      }
+    }
+  }
+  // Sort by frequency, take top 20
+  const sorted = Object.entries(nameCount).sort((a,b)=>b[1]-a[1]).slice(0,20).map(e=>e[0]);
+  // Build checkboxes
+  const el = document.getElementById('charCheckboxList');
+  let html = '';
+  const presetColors = ['#7C3AED','#B8860B','#E67E22','#DC2626','#2980B9','#27AE60','#E74C3C','#8E44AD','#2C3E50','#D35400','#1ABC9C','#F39C12','#9B59B6','#34495E','#16A085','#D35400','#C0392B','#7F8C8D'];
+  highlightChars = [];
+  sorted.forEach((name, i) => {
+    const color = presetColors[i % presetColors.length];
+    const checked = i < 5 ? 'checked' : ''; // auto-check top 5
+    if(checked) highlightChars.push({name, color});
+    html += '<label style="display:flex;align-items:center;gap:6px;padding:4px 0;margin:0;font-weight:400;font-size:14px;cursor:pointer">'
+      + '<input type="checkbox" class="char-cb" value="'+name+'" data-color="'+color+'" '+checked+' onchange="toggleChar(this)">'
+      + '<span style="flex:1">'+name+' <span class="hint">('+(nameCount[name]||0)+' 句)</span></span>'
+      + '<input type="color" value="'+color+'" class="color-picker" style="width:32px;height:22px" onchange="updateCharCbColor(this)">'
+      + '</label>';
+  });
+  el.innerHTML = html || '<p class="hint">未检测到角色</p>';
+}
+
+function toggleChar(cb) {
+  const name = cb.value;
+  const color = cb.dataset.color;
+  if(cb.checked) {
+    if(!highlightChars.find(c=>c.name===name)) highlightChars.push({name, color});
+  } else {
+    highlightChars = highlightChars.filter(c => c.name !== name);
+  }
+}
+
+function updateCharCbColor(picker) {
+  const label = picker.closest('label');
+  const cb = label.querySelector('.char-cb');
+  const name = cb.value;
+  const color = picker.value;
+  cb.dataset.color = color;
+  const found = highlightChars.find(c => c.name === name);
+  if(found) found.color = color;
+}
+
+// ====== Scene Review Step ======
+function doSceneDetection() {
+  // Parse lines from fileText
+  const rawLines = fileText.split('\n');
+  fileLines = [];
+  for(const l of rawLines) {
+    const s = l.trim();
+    if(s && /[\u4e00-\u9fff]/.test(s)) fileLines.push(s);
+  }
+  // Auto-detect scene titles
+  const detected = [];
+  for(const line of fileLines) {
+    if(/^第.+场/.test(line) || /^序幕/.test(line) || /^[春夏秋冬]$/.test(line) || /^谢幕/.test(line)) {
+      if(!detected.includes(line)) detected.push(line);
+    }
+  }
+  editedScenes = detected.slice();
+  renderReviewList();
+}
+
+function renderReviewList() {
+  const el = document.getElementById('reviewSceneList');
+  if(editedScenes.length === 0) {
+    el.innerHTML = '<p class="hint" style="padding:16px;text-align:center">未检测到任何场景标题，请手动添加</p>';
+    return;
+  }
+  let html = '<div style="margin:8px 0;color:#7A6A5A;font-size:13px">共 ' + editedScenes.length + ' 个场景，行间 ＋ 可插入</div>';
+  for(let i = 0; i < editedScenes.length; i++) {
+    html += '<div class="char-item">'
+      + '<span style="color:#7A6A5A;font-weight:700;margin-right:6px">' + (i+1) + '.</span>'
+      + '<input type="text" value="' + editedScenes[i].replace(/"/g,'&quot;') + '" class="review-edit" data-idx="' + i + '" style="flex:1;padding:6px 10px;font-size:14px">'
+      + '<button class="btn btn-small" onclick="insertReviewScene(' + (i+1) + ')" style="margin:0 2px;padding:2px 10px;background:#C4A882;color:#fff">＋</button>'
+      + '<button class="btn btn-small btn-danger" onclick="removeReviewScene(' + i + ')" style="margin:0;padding:4px 10px">✕</button>'
+      + '</div>';
+  }
+  el.innerHTML = html;
+  // Auto-save edits on input change
+  document.querySelectorAll('.review-edit').forEach(inp => {
+    inp.addEventListener('input', function() {
+      editedScenes[parseInt(this.dataset.idx)] = this.value;
+    });
+  });
+}
+
+function addReviewScene() {
+  const input = document.getElementById('reviewNewTitle');
+  const title = input.value.trim();
+  if(!title) { showError('reviewError','请输入场景名称'); return; }
+  document.getElementById('reviewError').classList.remove('show');
+  editedScenes.push(title);
+  renderReviewList();
+  input.value = '';
+}
+
+function removeReviewScene(index) {
+  editedScenes.splice(index, 1);
+  renderReviewList();
+}
+
+function insertReviewScene(index) {
+  editedScenes.splice(index, 0, '');
+  renderReviewList();
+  // Focus the newly inserted input
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.review-edit');
+    if(inputs[index]) inputs[index].focus();
+  }, 100);
+}
+
+document.getElementById('reviewNewTitle').addEventListener('keydown', e => {
+  if(e.key === 'Enter') addReviewScene();
+});
+
+// ====== Generation ======
+function generate() {
+  const errEl = document.getElementById('genError');
+  errEl.classList.remove('show');
+  if(highlightChars.length === 0) {
+    showError('genError','请至少添加一个高亮角色');
+    return;
+  }
+  const bgMode = document.querySelector('input[name="bgMode"]:checked').value;
+  let bodyBg, containerBg, textColor;
+  if(bgMode === 'eye') { bodyBg = '#F5E6D3'; containerBg = '#FDF6EC'; textColor = '#333333'; }
+  else if(bgMode === 'default') { bodyBg = '#F5EDE0'; containerBg = '#FFFBF5'; textColor = '#2c2c2c'; }
+  else { bodyBg = document.getElementById('bgColorInput').value || '#F5E6D3'; containerBg = lighten(bodyBg); textColor = '#222222'; }
+  const otherMode = document.querySelector('input[name="otherColor"]:checked').value;
+  const otherColor = otherMode === 'custom' ? document.getElementById('otherColorInput').value || '#000000' : '#000000';
+
+  // Save config to global for later use
+  window._genConfig = { bodyBg, containerBg, textColor, otherColor };
+
+  // Do scene detection and show review step
+  doSceneDetection();
+  showStep('step-review');
+}
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function confirmScenes() {
+  sceneTitles = editedScenes.filter(t => t.trim());
+  if(sceneTitles.length === 0) {
+    showError('reviewError','场景列表为空，请至少保留一个场景');
+    return;
+  }
+
+  const cfg = window._genConfig;
+  document.querySelector('#step-review').classList.remove('active');
+  document.querySelector('#step-loading').classList.add('active');
+
+  setTimeout(() => {
+    try {
+      resultHTML = generateHTML(cfg.bodyBg, cfg.containerBg, cfg.textColor, cfg.otherColor);
+      document.querySelector('#step-loading').classList.remove('active');
+      document.querySelector('#step-result').classList.add('active');
+      document.getElementById('resultInfo').innerHTML =
+        '共识别 <strong>'+sceneTitles.length+'</strong> 个场景 · <strong>'+highlightChars.length+'</strong> 个高亮角色 · 文件大小 <strong>'+(resultHTML.length/1024).toFixed(1)+'KB</strong>';
+    } catch(e) {
+      document.querySelector('#step-loading').classList.remove('active');
+      document.querySelector('#step-review').classList.add('active');
+      showError('reviewError','生成失败：'+e.message);
+      console.error(e);
+    }
+  }, 100);
+}
+
+function lighten(hex) {
+  if(!hex||hex==='#') return '#FDF6EC';
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return '#'+[r,g,b].map(v=>Math.min(255,v+30).toString(16).padStart(2,'0')).join('');
+}
+
+function darken(hex, amt=40) {
+  if(!hex||hex==='#') return '#5A3E2E';
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return '#'+[r,g,b].map(v=>Math.max(0,v-amt).toString(16).padStart(2,'0')).join('');
+}
+
+function lightShade(hex) {
+  if(!hex||hex==='#') return '#A78BFA';
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return '#'+[r,g,b].map(v=>Math.min(255, v+Math.round((255-v)*0.45)).toString(16).padStart(2,'0')).join('');
+}
+
+// ====== HTML Generation ======
+function generateHTML(bodyBg, containerBg, textColor, otherColor) {
+  // Parse fileText into lines
+  const rawLines = fileText.split('\n');
+  const lines = [];
+  for(const l of rawLines) {
+    const s = l.trim();
+    if(s && /[\u4e00-\u9fff]/.test(s)) lines.push(s);
+  }
+  if(lines.length === 0) throw new Error('未从文件中解析到有效文本内容');
+
+  // === PASS 0: sceneTitles already from review step, match against actual lines ===
+  // Store original user titles for fallback
+  const originalTitles = sceneTitles.slice();
+  const resolvedTitles = [];
+  for(const st of originalTitles) {
+    // Try exact match first, then fuzzy (contains)
+    const exact = lines.find(l => l === st);
+    if(exact) { resolvedTitles.push(exact); continue; }
+    const partial = lines.find(l => l.indexOf(st) >= 0);
+    if(partial) { resolvedTitles.push(partial); continue; }
+    // No match in text - use the user's text directly (it might be a custom label)
+    resolvedTitles.push(st);
+  }
+  sceneTitles = resolvedTitles;
+
+  const allVerifiedChars = new Set();
+  const skipNames = new Set(['幕间过场','幕间','冬第四幕','春尾声','序幕','谢幕']);
+
+  for(const line of lines) {
+    // Skip scene title lines (already identified above)
+    if(/^第.+场/.test(line) || /^序幕/.test(line) || /^[春夏秋冬]$/.test(line) || /^谢幕/.test(line)) continue;
+    // Extract speaker from dialogue lines
+    const dm = line.match(/^(.+?)(（[^）]*）)?[：:]/);
+    if(dm) {
+      let cname = dm[1].trim().replace(/\s+/g,'');
+      // Filter: must have actual dialogue text after the colon
+      const afterColon = line.substring(line.indexOf('：') + 1).trim();
+      // Only accept as verified character if:
+      // (a) name is not in skip list
+      // (b) name has actual dialogue text (not empty)
+      // (c) name looks like a real character name (2-4 Chinese chars typical)
+      if(!skipNames.has(cname) && afterColon.length > 0 && /^[\u4e00-\u9fff]{1,6}$/.test(cname)) {
+        allVerifiedChars.add(cname);
+      }
+    }
+  }
+
+  // === PASS 1: Build scene content mapping, filtered against verified characters ===
+  const scenes = [];
+  let currentSceneChars = new Set();
+  let inScene = false;
+  let sceneIdx = -1;
+
+  for(const line of lines) {
+    const titleMatch = sceneTitles.findIndex(t => line.indexOf(t) >= 0);
+    if(titleMatch >= 0) {
+      if(inScene) {
+        scenes[scenes.length-1] = {title: sceneTitles[sceneIdx], chars: currentSceneChars};
+      }
+      currentSceneChars = new Set();
+      scenes.push({title: sceneTitles[titleMatch], chars: currentSceneChars});
+      sceneIdx = titleMatch;
+      inScene = true;
+      continue;
+    }
+    // Extract character name from dialogue line
+    const m = line.match(/^(.+?)(（[^）]*）)?[：:]/);
+    if(m) {
+      const cname = m[1].trim().replace(/\s+/g,'');
+      // Only add if it's a verified character (appears elsewhere as a real speaker)
+      if(allVerifiedChars.has(cname)) {
+        currentSceneChars.add(cname);
+      }
+    }
+  }
+  // Ensure last scene is saved
+  if(inScene && scenes.length > 0) {
+    scenes[scenes.length-1].chars = currentSceneChars;
+  }
+
+  // === PASS 2: Build content HTML ===
+  const contentItems = [];
+  let sceneCounter = 0;
+
+  for(const line of lines) {
+    // Scene title - match via sceneTitles array
+    const titleMatch = sceneTitles.findIndex(t => line.indexOf(t) >= 0);
+    if(titleMatch >= 0) {
+      sceneCounter++;
+      const sid = 'scene-'+sceneCounter;
+      const displayTitle = sceneTitles[titleMatch];
+      contentItems.push('<div class="scene-title" id="'+sid+'">'+escapeHTML(displayTitle)+' <a class="to-top" href="#">↑ 顶部</a></div>');
+      continue;
+    }
+
+    // Stage direction
+    if(line.startsWith('【') || line.startsWith('[')) {
+      let text = escapeHTML(line);
+      // Apply inferred highlight for character names in stage directions
+      for(const hc of highlightChars) {
+        const cls = 'ref-hl-'+hc.name.replace(/\s+/g,'').toLowerCase();
+        const pattern = hc.name.split('').join('\\s*');
+        const regex = new RegExp('('+pattern+')', 'g');
+        text = text.replace(regex, '<span class="'+cls+'">$1</span>');
+      }
+      contentItems.push('<div class="stage-dir">'+text+'</div>');
+      continue;
+    }
+
+    // Dialogue
+    const dm = line.match(/^(.+?)(（[^）]*）)?[：:](.*)/);
+    if(dm) {
+      const charName = dm[1].trim();
+      const action = dm[2] || '';
+      const dialog = dm[3];
+      const cleanName = charName.replace(/\s+/g,'');
+      let cls = 'other';
+      for(const hc of highlightChars) {
+        if(cleanName === hc.name.replace(/\s+/g,'')) {
+          cls = 'dialog-hl-'+cleanName.toLowerCase();
+          break;
+        }
+      }
+      const en = escapeHTML(charName);
+      const ea = action ? escapeHTML(action) : '';
+      const et = escapeHTML(dialog);
+      let html = '<div class="dialogue '+cls+'"><span class="char-name">'+en+'</span>';
+      if(ea) html += '<span class="action-parens">'+ea+'</span>';
+      html += '<span class="char-sep">：</span><span class="char-text">'+et+'</span></div>';
+      contentItems.push(html);
+      continue;
+    }
+
+    // Plain stage direction fallback
+    contentItems.push('<div class="stage-dir">'+escapeHTML(line)+'</div>');
+  }
+
+  // Build TOC with character notes
+  const charOrder = ['若莲','老爷','大太太','二太太','三太太','燕儿','管家','曹二婶','高医生','飞浦','丫鬟','五太太','梅芯'];
+  const tocItems = [];
+  for(let i=0; i<scenes.length; i++) {
+    const scene = scenes[i];
+    if(!scene) continue;
+    const charsSet = scene.chars || new Set();
+    const matched = [];
+    const remaining = new Set(charsSet);
+    // First match highlighted characters (in order)
+    for(const hc of highlightChars) {
+      const cleanName = hc.name.replace(/\s+/g,'');
+      if(remaining.has(cleanName)) {
+        matched.push(hc.name);
+        remaining.delete(cleanName);
+      }
+    }
+    // Then the remaining in predefined order
+    for(const co of charOrder) {
+      if(remaining.has(co)) { matched.push(co); remaining.delete(co); }
+    }
+    // Any leftover
+    for(const c of remaining) matched.push(c);
+    const charStr = matched.length > 0 ? matched.join('、') : '（无台词）';
+    tocItems.push('    <li><a href="#scene-'+(i+1)+'"><span class="toc-scene">'+scene.title+'</span> <span class="toc-chars">— '+charStr+'</span></a></li>');
+  }
+
+  // Build CSS
+  const titleColor = darken(bodyBg, 100);
+  const borderColor = lightShade(bodyBg);
+
+  let hlCSS = '';
+  let refCSS = '';
+  for(const hc of highlightChars) {
+    const clean = hc.name.replace(/\s+/g,'').toLowerCase();
+    hlCSS += '  .dialog-hl-'+clean+' .char-name, .dialog-hl-'+clean+' .char-text { color: '+hc.color+'; font-weight: 700; }\n';
+    refCSS += '  .ref-hl-'+clean+' { color: '+lightShade(hc.color)+'; font-weight: 700; }\n';
+  }
+
+  const fileName = uploadedFile.name.replace(/\.(doc|docx|txt)$/,'');
+  const subtitle = '台词高亮版 · '+highlightChars.map(c => '<span style="color:'+c.color+'">●</span> '+c.name).join(' | ');
+
+  return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>'+escapeHTML(fileName)+' - 台词高亮版</title>\n<style>\n' +
+    '  * { margin:0; padding:0; box-sizing:border-box; }\n' +
+    '  body { background:'+bodyBg+'; color:'+textColor+'; font-family:\'Noto Serif SC\',\'SimSun\',\'STSong\',\'Songti SC\',serif; line-height:2.0; padding:30px 16px; font-size:17px; }\n' +
+    '  .container { max-width:780px; margin:0 auto; background:'+containerBg+'; padding:36px 44px; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }\n' +
+    '  h1 { text-align:center; font-size:26px; color:'+titleColor+'; margin-bottom:8px; letter-spacing:4px; padding-bottom:14px; border-bottom:2px solid '+borderColor+'; }\n' +
+    '  .subtitle { text-align:center; color:#6a6a5a; font-size:14px; margin-bottom:24px; }\n' +
+    '  .char-sep { font-weight:inherit; }\n' +
+    '  .stage-dir { color:#6a7a6a; font-size:14px; padding:3px 0; }\n' +
+    '  .scene-title { color:'+titleColor+'; font-weight:700; font-size:18px; margin-top:20px; margin-bottom:6px; padding:6px 0; border-bottom:1px dashed '+borderColor+'; overflow:hidden; }\n' +
+    '  .dialogue { padding:2px 0; }\n' +
+    '  .char-name { font-weight:700; }\n' +
+    hlCSS +
+    '  .other .char-name, .other .char-text { color: '+otherColor+'; font-weight:400; }\n' +
+    refCSS +
+    '  .action-parens { color:#6a7a6a; font-size:14px; }\n' +
+    '  .empty-line { height:8px; }\n' +
+    '  .footer { text-align:center; color:#6a7a6a; font-size:12px; margin-top:24px; padding-top:14px; border-top:1px solid '+borderColor+'; }\n' +
+    '  .toc { background:'+lightShade(bodyBg)+'; border-radius:8px; padding:16px 20px; margin-bottom:24px; }\n' +
+    '  .toc-title { font-size:17px; font-weight:700; color:#5A4A3A; margin-bottom:10px; text-align:center; letter-spacing:3px; }\n' +
+    '  .toc-list { list-style:none; padding:0; margin:0; }\n' +
+    '  .toc-list li { font-size:14px; padding:5px 0; border-bottom:1px dotted '+borderColor+'; line-height:1.6; }\n' +
+    '  .toc-list li:last-child { border-bottom:none; }\n' +
+    '  .toc-list a { color:#3A4A3A; text-decoration:none; padding:3px 8px; border-radius:4px; display:block; transition:background .2s; }\n' +
+    '  .toc-list a:hover { background:'+containerBg+'; }\n' +
+    '  .toc-scene { font-weight:700; }\n' +
+    '  .toc-chars { font-weight:400; color:#6A5A4A; font-size:13px; }\n' +
+    '  .to-top { float:right; font-size:13px; color:#C4A882; text-decoration:none; font-weight:400; padding:0 6px; border-radius:4px; transition:color .2s,background .2s; line-height:1.4; }\n' +
+    '  .to-top:hover { color:#fff; background:#C4A882; }\n' +
+    '  .back-to-top { display:block; width:fit-content; margin:28px auto 0; padding:10px 28px; background:#C4A882; color:#fff; font-size:15px; font-weight:700; text-align:center; text-decoration:none; border-radius:24px; letter-spacing:2px; transition:background .2s; }\n' +
+    '  .back-to-top:hover { background:#A88B6A; }\n' +
+    '  html { scroll-behavior:smooth; }\n' +
+    '  @media(max-width:640px) { body{padding:16px 10px;font-size:16px} .container{padding:20px 16px;border-radius:8px} h1{font-size:22px;letter-spacing:2px} .scene-title{font-size:16px;margin-top:16px} .stage-dir{font-size:13px} .toc{padding:12px 14px} .toc-list li{font-size:13px;padding:4px 0} .toc-chars{font-size:12px} .to-top{font-size:12px} .back-to-top{padding:8px 22px;font-size:14px} }\n' +
+    '  @media(max-width:400px) { body{padding:10px 6px;font-size:15px} .container{padding:14px 10px;border-radius:6px} h1{font-size:19px;letter-spacing:1px} .toc{padding:10px 10px} .toc-title{font-size:15px} .toc-list li{font-size:12px;padding:3px 0} .toc-chars{font-size:11px} .to-top{font-size:11px;padding:0 4px} .back-to-top{padding:6px 18px;font-size:13px} }\n' +
+    '</style>\n</head>\n<body>\n<div class="container">\n' +
+    '<h1>🎭 '+escapeHTML(fileName)+'</h1>\n' +
+    '<p class="subtitle">'+subtitle+'</p>\n' +
+    '<div class="toc">\n  <div class="toc-title">📖 目 录</div>\n  <ol class="toc-list">\n'+tocItems.join('\n')+'\n  </ol>\n</div>\n' +
+    '<div class="content">\n'+contentItems.join('\n')+'\n</div>\n' +
+    '<a href="#" class="back-to-top">⬆ 回到顶部</a>\n' +
+    '<div class="footer"><p>🎭 由「剧本台词高亮工具」生成</p><p style="margin-top:6px;font-size:11px;color:#8a7a6a;opacity:0.6">晨眠 &amp; reasonix &amp; ds-v4</p></div>\n' +
+    '</div>\n</body>\n</html>';
+}
+
+function escapeHTML(s) {
+  if(!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ====== Result Actions ======
+function downloadResult() {
+  const blob = new Blob([resultHTML], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (uploadedFile.name.replace(/\.(doc|docx|txt)$/,'') || '剧本') + '-台词高亮版.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function previewResult() {
+  const area = document.getElementById('previewArea');
+  const frame = document.getElementById('previewFrame');
+  area.style.display = 'block';
+  // Use blob URL for reliable anchor navigation inside iframe
+  if(frame._blobUrl) URL.revokeObjectURL(frame._blobUrl);
+  const blob = new Blob([resultHTML], {type: 'text/html;charset=utf-8'});
+  frame._blobUrl = URL.createObjectURL(blob);
+  frame.src = frame._blobUrl;
+  // Adjust iframe height after load
+  frame.onload = function() {
+    try {
+      const h = frame.contentDocument.documentElement.scrollHeight;
+      if(h > 100) frame.style.height = Math.min(h, window.innerHeight * 0.8) + 'px';
+    } catch(e){}
+  };
+}
+
+function resetAll() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-upload').classList.add('active');
+  document.getElementById('previewArea').style.display = 'none';
+  uploadedFile = null; fileText = ''; fileLines = []; highlightChars = []; resultHTML = []; editedScenes = [];
+  fileInput.value = '';
+  document.getElementById('fileInfo').style.display = 'none';
+}
+
+// Enter key for review scene input (handled inline)
+</script>
+</body>
+</html>
