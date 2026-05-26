@@ -360,7 +360,13 @@ function parseDocRaw(buf) {
   for(let i=0; i<raw.length; i++) {
     const c = raw[i];
     const code = c.charCodeAt(0);
-    if((code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3000 && code <= 0x303f) || '，。！？、：（）【】\n'.includes(c) || c === ' ') {
+    if((code >= 0x4e00 && code <= 0x9fff) || // CJK
+       (code >= 0x3000 && code <= 0x303f) || // CJK Symbols
+       (code >= 0xff00 && code <= 0xffef) || // Fullwidth
+       code === 0x0a || code === 0x0d ||     // newlines
+       (code >= 0x30 && code <= 0x39) ||     // digits 0-9
+       code === 0x20 ||                       // space
+       '，。！？、：（）【】《》—…·"\'「」『』'.includes(c)) {
       clean += c;
     }
   }
