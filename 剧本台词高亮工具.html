@@ -132,7 +132,7 @@ input,select,button{font-size:16px!important}
   <div class="form-group">
     <div class="form-group-title">1. 背景模式</div>
     <div class="radio-group">
-      <label><input type="radio" name="bgMode" value="eye" checked> 护眼模式（豆沙绿）</label>
+      <label><input type="radio" name="bgMode" value="eye" checked> 护眼模式（暖杏色）</label>
       <label><input type="radio" name="bgMode" value="default"> 默认（茶白色）</label>
       <label><input type="radio" name="bgMode" value="custom"> 自定义</label>
     </div>
@@ -256,15 +256,33 @@ async function handleFile(file) {
     }
     // Normalize line endings
     fileText = fileText.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-    // Trim leading garbage - find script title or first meaningful line
-    const scriptStart = fileText.indexOf('宅锁孤灯');
+    // Multi-pass cleaning for garbage removal
+    // Pass 1: find first scene title or script name as anchor
+    const anchors = ['宅锁孤灯', '序幕', '第一幕', '第一场'];
+    let scriptStart = -1;
+    for(const a of anchors) {
+      const idx = fileText.indexOf(a);
+      if(idx >= 0) { scriptStart = idx; break; }
+    }
     if(scriptStart > 0) fileText = fileText.substring(scriptStart);
-    // Cut at last 谢幕 to remove font table garbage
+    
+    // Pass 2: cut at last 谢幕 to remove font table garbage
     const lastXie = fileText.lastIndexOf('谢幕');
     if(lastXie > 0) {
       const afterXie = fileText.indexOf('\n', lastXie);
       fileText = afterXie > 0 ? fileText.substring(0, afterXie) : fileText.substring(0, lastXie + 2);
     }
+    
+    // Pass 3: aggressive cleanup - remove any remaining non-script garbage lines
+    const cleanedLines = fileText.split('\n').filter(l => {
+      const t = l.trim();
+      if(!t) return true; // keep empty lines (scene spacing)
+      const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+      const punct = (t.match(/[，。！？、：（）【】]/g) || []).length;
+      // Keep if has content characters, reject if mostly garbage
+      return cjk + punct > 0;
+    });
+    fileText = cleanedLines.join('\n');
     showFileInfo(file);
     document.querySelector('#step-upload').classList.remove('active');
     document.querySelector('#step-config').classList.add('active');
@@ -352,19 +370,34 @@ function parseDocRaw(buf) {
   let raw = '';
   for(let i=0; i<bytes.length; i+=2) {
     const code = bytes[i] | (bytes[i+1] << 8);
-    if(code === 0) continue;
+    if(code === 0 || code < 0x20) continue;
     raw += String.fromCharCode(code);
   }
   raw = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  // Keep only valid script characters
   let clean = '';
   for(let i=0; i<raw.length; i++) {
     const c = raw[i];
     const code = c.charCodeAt(0);
-    if((code >= 0x4e00 && code <= 0x9fff) || (code >= 0x3000 && code <= 0x303f) || '，。！？、：（）【】\n'.includes(c) || c === ' ') {
+    // CJK Unified, CJK Symbols, fullwidth punctuation, common Chinese punctuation
+    if((code >= 0x4e00 && code <= 0x9fff) ||
+       (code >= 0x3000 && code <= 0x303f) ||
+       (code >= 0xff00 && code <= 0xffef) ||
+       '，。！？、：（）【】「」『』《》—…·'.includes(c) ||
+       c === ' ' || c === '\n') {
       clean += c;
     }
   }
-  clean = clean.replace(/\n{4,}/g, '\n\n\n');
+  // Remove excessive blank lines, keep max 2 consecutive
+  clean = clean.replace(/\n{3,}/g, '\n\n');
+  // Remove lines that are just punctuation or whitespace
+  clean = clean.split('\n').filter(l => {
+    const trimmed = l.trim();
+    if(!trimmed) return false;
+    // Count CJK chars vs total chars
+    const cjkCount = (trimmed.match(/[\u4e00-\u9fff]/g) || []).length;
+    return cjkCount > 0; // Keep lines that have at least 1 CJK character
+  }).join('\n');
   return clean;
 }
 
