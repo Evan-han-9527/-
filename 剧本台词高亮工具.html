@@ -370,34 +370,25 @@ function parseDocRaw(buf) {
   let raw = '';
   for(let i=0; i<bytes.length; i+=2) {
     const code = bytes[i] | (bytes[i+1] << 8);
-    if(code === 0 || code < 0x20) continue;
+    if(code === 0) continue;
     raw += String.fromCharCode(code);
   }
   raw = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-  // Keep only valid script characters
+  // Keep only valid script characters, preserve newlines
   let clean = '';
   for(let i=0; i<raw.length; i++) {
     const c = raw[i];
     const code = c.charCodeAt(0);
-    // CJK Unified, CJK Symbols, fullwidth punctuation, common Chinese punctuation
-    if((code >= 0x4e00 && code <= 0x9fff) ||
-       (code >= 0x3000 && code <= 0x303f) ||
-       (code >= 0xff00 && code <= 0xffef) ||
-       '，。！？、：（）【】「」『』《》—…·'.includes(c) ||
-       c === ' ' || c === '\n') {
+    if(code === 0x0a || code === 0x0d) { clean += '\n'; continue; } // keep newlines
+    if(code >= 0x20 && code <= 0x7e) { clean += c; continue; } // ASCII printable
+    if((code >= 0x4e00 && code <= 0x9fff) || // CJK
+       (code >= 0x3000 && code <= 0x303f) || // CJK symbols
+       (code >= 0xff00 && code <= 0xffef)) { // Fullwidth
       clean += c;
     }
   }
-  // Remove excessive blank lines, keep max 2 consecutive
-  clean = clean.replace(/\n{3,}/g, '\n\n');
-  // Remove lines that are just punctuation or whitespace
-  clean = clean.split('\n').filter(l => {
-    const trimmed = l.trim();
-    if(!trimmed) return false;
-    // Count CJK chars vs total chars
-    const cjkCount = (trimmed.match(/[\u4e00-\u9fff]/g) || []).length;
-    return cjkCount > 0; // Keep lines that have at least 1 CJK character
-  }).join('\n');
+  // Remove excessive blank lines
+  clean = clean.replace(/\n{4,}/g, '\n\n\n');
   return clean;
 }
 
